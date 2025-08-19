@@ -289,40 +289,31 @@ done
 ### TODO: Implement this cleanly.
 
 ### ----- MAGISKSU
+
 # shellcheck disable=SC2117
-if [[ -z "$SKIP_SBIN" && "$(/sbin/su -v)" == *"MAGISKSU" ]]; then
-	# We are on Magisk su
-	su_args=("/sbin/su")
-	[[ -z "$SWITCH_USER" ]] || su_args+=("$SWITCH_USER")
-
-	if [[ -n "$ENVIRONMENT_PRESERVE" ]]; then
-		su_args+=("--preserve-environment")
-		su_cmdline="PATH=$BB_MAGISK:$PATH $ENV_BUILT $STARTUP_SCRIPT"
-	else
-		su_cmdline="PATH=$BB_MAGISK env -i $ENV_BUILT $STARTUP_SCRIPT"
-	fi
-	su_args+=("-c")
-	exec "${su_args[@]}" "${su_cmdline}"
-	##### ----- END MAGISKSU
-else
-	##### ----- OTHERS SU
-	for SU_BINARY in "${SU_BINARY_SEARCH[@]}"; do
-		if [[ -x "$SU_BINARY" ]]; then
-
-			su_args=("$SU_BINARY")
-			[[ -z "$SWITCH_USER" ]] || su_args+=("$SWITCH_USER")
-
-			# Let's use the system toybox/toolbox for now
-			if [[ -n "$ENVIRONMENT_PRESERVE" ]]; then
-				su_args+=("--preserve-environment")
-				su_cmdline="PATH=$ANDROID_SYSPATHS:$PATH $ENV_BUILT $STARTUP_SCRIPT "
-			else
-				su_cmdline="PATH=$ANDROID_SYSPATHS env -i $ENV_BUILT $STARTUP_SCRIPT"
-			fi
-			su_args+=("-c")
-			exec "${su_args[@]}" "${su_cmdline}"
-		fi
-	done
+# 检查 MagiskSU 的可能路径（包括新旧版本）
+magisk_paths=("/sbin/su" "/debug_ramdisk/su")
+magisk_found=false
+for magisk_su in "${magisk_paths[@]}"; do
+    if [[ -z "$SKIP_MAGISK" && -x "$magisk_su" && "$("$magisk_su" -v)" == *"MAGISKSU"* ]]; then
+        # 找到 MagiskSU
+        magisk_found=true
+        su_args=("$magisk_su")
+        [[ -z "$SWITCH_USER" ]] || su_args+=("$SWITCH_USER")
+        if [[ -n "$ENVIRONMENT_PRESERVE" ]]; then
+            su_args+=("--preserve-environment")
+            su_cmdline="PATH=$BB_MAGISK:$PATH $ENV_BUILT $STARTUP_SCRIPT"
+        else
+            su_cmdline="PATH=$BB_MAGISK env -i $ENV_BUILT $STARTUP_SCRIPT"
+        fi
+        
+        su_args+=("-c")
+        exec "${su_args[@]}" "$su_cmdline"
+        break
+    fi
+done
+if [ "$magisk_found" = true ]; then
+    exit 0
 fi
 ##### ----- END OTHERS SU
 
